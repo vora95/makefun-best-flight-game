@@ -1,14 +1,25 @@
-// hud.js — the instrument panel: altitude, speed, heading, fuel, score,
-// the compass strip, the artificial horizon, and the toast messages.
-// All numbers are pilot units: feet, knots, degrees.
-import { RING_COUNT, ringDistance } from './rings.js';
+// hud.js — the instrument panel: altitude, speed, heading, vertical
+// speed, fuel, score, the compass strip, the artificial horizon, and the
+// toast messages. All numbers are pilot units: feet, knots, degrees,
+// feet per minute. DOM lookups happen once, up front, into `el`.
+import { RING_COUNT, ringDistance, ringName } from './rings.js';
 
-const $ = (id) => document.getElementById(id);
+// One lookup per element, at module load; every updater reads from here.
+const el = {};
+for (const id of [
+  'hud-alt', 'hud-spd', 'hud-hdg', 'hud-vsi', 'hud-score', 'hud-ring', 'hud-time',
+  'hud-fuelfill', 'hud-thrfill', 'hud-thr', 'hud-gear', 'hud-dist', 'hud-next',
+  'compass-strip', 'attitude', 'hud-warn', 'hud-toast', 'hud-center',
+  'menu', 'pause', 'end', 'hud',
+]) el[id] = document.getElementById(id);
 
 const FT_PER_M = 3.28084;
 const KT_PER_MS = 1.94384;
+const FPM_PER_MS = 196.85;
+const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const PX_PER_DEG = 12; // compass strip: 60 px per 5 degrees
 
-function fmtTime(seconds) {
+function fmtClock(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
@@ -20,60 +31,85 @@ function headingDeg(yaw) {
   return Math.round(h);
 }
 
-const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
 export function buildCompassStrip() {
-  const el = $('compass-strip');
-  let html = '';
-  for (let deg = 0; deg < 360; deg += 5) {
-    const label = deg % 45 === 0 ? COMPASS_POINTS[deg / 45] : String(deg).padStart(3, '0');
-    html += `<span style="display:inline-block;width:60px;text-align:center">${label}</span>`;
+  // One span per 5 degrees, doubled so the strip can wrap around.
+  const strip = el['compass-strip'];
+  const frag = document.createDocumentFragment();
+  const makeSpan = (label) => {
+    const s = document.createElement('span');
+    s.style.cssText = 'display:inline-block;width:60px;text-align:center';
+    s.textContent = label;
+    return s;
+  };
+  for (let pass = 0; pass < 2; pass++) {
+    for (let deg = 0; deg < 360; deg += 5) {
+      frag.appendChild(makeSpan(deg % 45 === 0 ? COMPASS_POINTS[deg / 45] : String(deg).padStart(3, '0')));
+    }
   }
-  el.innerHTML = html + html; // doubled so the strip can wrap
+  strip.appendChild(frag);
+}
+
+function setReadout(id, value) {
+  const node = el[id];
+  if (node.textContent !== value) node.textContent = value;
 }
 
 export function updateHud(state, course) {
-  $('hud-alt').textContent = Math.round(state.pos.y * FT_PER_M).toLocaleString('en-US');
-  $('hud-spd').textContent = Math.round(state.speed * KT_PER_MS);
-  $('hud-hdg').innerHTML = String(headingDeg(state.yaw)).padStart(3, '0') + '&deg;';
-  $('hud-score').textContent = state.score.toLocaleString('en-US');
-  $('hud-ring').textContent = `${state.ringsPassed}/${RING_COUNT}`;
-  $('hud-time').textContent = fmtTime(state.timeLeft);
-  const fuelEl = $('hud-fuelfill');
+  setReadout('hud-alt', Math.round(state.pos.y * FT_PER_M).toLocaleString('en-US'));
+  setReadout('hud-spd', String(Math.round(state.speed * KT_PER_MS)));
+  el['hud-hdg'].innerHTML = String(headingDeg(state.yaw)).padStart(3, '0') + '&deg;';
+  const vsi = Math.round(state.vspeed * FPM_PER_MS);
+  setReadout('hud-vsi', (vsi > 0 ? '+' : '') + vsi.toLocaleString('en-US'));
+  setReadout('hud-score', state.score.toLocaleString('en-US'));
+  setReadout('hud-ring', `${state.ringsPassed}/${RING_COUNT}`);
+  setReadout('hud-time', fmtClock(state.timeLeft));
+  const fuelEl = el['hud-fuelfill'];
   fuelEl.style.width = `${Math.round(state.fuel * 100)}%`;
   fuelEl.classList.toggle('low', state.fuel < 0.25);
-  $('hud-thrfill').style.width = `${Math.round(state.throttle * 100)}%`;
-  $('hud-thr').textContent = `${Math.round(state.throttle * 100)}%`;
-  $('hud-gear').textContent = state.gearDown ? 'GEAR DOWN' : 'GEAR UP';
-  $('hud-gear').classList.toggle('up', !state.gearDown);
-  const dist = ringDistance(course, state.ringsPassed, state.pos);
-  $('hud-dist').textContent = state.ringsPassed >= RING_COUNT ? 'COURSE DONE' : `${dist} m`;
+  el['hud-thrfill'].style.width = `${Math.round(state.throttle * 100)}%`;
+  setReadout('hud-thr', `${Math.round(state.throttle * 100)}%`);
+  setReadout('hud-gear', state.gearDown ? 'GEAR DOWN' : 'GEAR UP');
+  el['hud-gear'].classList.toggle('up', !state.gearDown);
+  const done = state.ringsPassed >= RING_COUNT;
+  setReadout('hud-dist', done ? 'COURSE DONE' : `${ringDistance(course, state.ringsPassed, state.pos)} m`);
+  el['hud-next'].firstChild.textContent = done
+    ? 'ALL RINGS FLOWN — LAND AT TANJUNG '
+    : `NEXT RING ${ringName(state.ringsPassed).toUpperCase()} `;
 
-  // Compass strip: 60 px per 5 degrees, needle fixed at the centre.
-  const strip = $('compass-strip');
-  const hdg = headingDeg(state.yaw);
-  const pxPerDeg = 12;
-  const offset = 170 - hdg * pxPerDeg;
-  const wrapped = ((offset % (360 * pxPerDeg)) + 360 * pxPerDeg) % (360 * pxPerDeg) - 360 * pxPerDeg;
+  // Compass strip: needle fixed at the centre, strip slides under it.
+  const strip = el['compass-strip'];
+  const offset = 170 - headingDeg(state.yaw) * PX_PER_DEG;
+  const span = 360 * PX_PER_DEG;
+  const wrapped = ((offset % span) + span) % span - span;
   strip.style.transform = `translateX(${wrapped}px)`;
 
   drawAttitude(state);
-  const warn = $('hud-warn');
+  updateWarning(state);
+}
+
+// Priority order: low fuel beats stall, because the fix is different
+// (land now vs push the nose down). Returns the active warning, if any.
+function updateWarning(state) {
+  const warn = el['hud-warn'];
+  let text = '';
   if (state.fuel > 0 && state.fuel < 0.2 && state.airborne) {
-    warn.textContent = 'LOW FUEL — LAND ON THE RUNWAY';
-    warn.classList.add('show');
+    text = 'LOW FUEL — LAND ON THE RUNWAY';
   } else if (state.airborne && state.speed < 26) {
-    warn.textContent = 'STALL — PUSH THE NOSE DOWN, ADD POWER';
+    text = 'STALL — PUSH THE NOSE DOWN, ADD POWER';
+  }
+  if (text) {
+    if (warn.textContent !== text) warn.textContent = text;
     warn.classList.add('show');
   } else {
     warn.classList.remove('show');
   }
+  return text;
 }
 
 // Artificial horizon: a canvas with a sky/ground split that rolls and
 // pitches with the plane, plus a fixed centre marker.
 function drawAttitude(state) {
-  const cv = $('attitude');
+  const cv = el.attitude;
   const g = cv.getContext('2d');
   const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = 72;
   g.save();
@@ -97,7 +133,10 @@ function drawAttitude(state) {
   // Fixed aircraft marker + rim.
   g.strokeStyle = '#ffd27a';
   g.lineWidth = 3;
-  g.beginPath(); g.moveTo(cx - 26, cy); g.lineTo(cx - 8, cy); g.moveTo(cx + 8, cy); g.lineTo(cx + 26, cy); g.stroke();
+  g.beginPath();
+  g.moveTo(cx - 26, cy); g.lineTo(cx - 8, cy);
+  g.moveTo(cx + 8, cy); g.lineTo(cx + 26, cy);
+  g.stroke();
   g.beginPath(); g.arc(cx, cy, 3, 0, Math.PI * 2); g.fillStyle = '#ffd27a'; g.fill();
   g.strokeStyle = 'rgba(244,234,210,0.6)';
   g.lineWidth = 2;
@@ -108,27 +147,27 @@ let toastTimer = null;
 let centerTimer = null;
 
 export function toast(text, ms = 1600) {
-  const el = $('hud-toast');
-  el.textContent = text;
-  el.classList.add('show');
+  const node = el['hud-toast'];
+  node.textContent = text;
+  node.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  toastTimer = setTimeout(() => node.classList.remove('show'), ms);
 }
 
 export function centerFlash(text, ms = 700) {
-  const el = $('hud-center');
-  el.textContent = text;
-  el.classList.add('show');
+  const node = el['hud-center'];
+  node.textContent = text;
+  node.classList.add('show');
   clearTimeout(centerTimer);
-  centerTimer = setTimeout(() => el.classList.remove('show'), ms);
+  centerTimer = setTimeout(() => node.classList.remove('show'), ms);
 }
 
 export function showOverlay(id) {
-  for (const o of ['menu', 'pause', 'end']) $(o).classList.toggle('hidden', o !== id);
-  $('hud').classList.toggle('hidden', id === 'menu');
+  for (const o of ['menu', 'pause', 'end']) el[o].classList.toggle('hidden', o !== id);
+  el.hud.classList.toggle('hidden', id === 'menu');
 }
 
 export function hideOverlays() {
-  for (const o of ['menu', 'pause', 'end']) $(o).classList.add('hidden');
-  $('hud').classList.remove('hidden');
+  for (const o of ['menu', 'pause', 'end']) el[o].classList.add('hidden');
+  el.hud.classList.remove('hidden');
 }
