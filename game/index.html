@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKYRING COURIER — a flight game</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="game-root"></div>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="hud-top-left" class="hud-panel">
+    <div class="hud-row"><span class="hud-label">ALT</span><span id="hud-alt" class="hud-big">0</span><span class="hud-unit">FT</span></div>
+    <div class="hud-row"><span class="hud-label">SPD</span><span id="hud-spd" class="hud-big">0</span><span class="hud-unit">KT</span></div>
+    <div class="hud-row"><span class="hud-label">HDG</span><span id="hud-hdg" class="hud-big">000&deg;</span></div>
+  </div>
+
+  <div id="hud-compass"><div id="compass-strip"></div><div id="compass-needle">&#9660;</div></div>
+
+  <div id="hud-top-right" class="hud-panel">
+    <div class="hud-row"><span class="hud-label">SCORE</span><span id="hud-score" class="hud-big">0</span></div>
+    <div class="hud-row"><span class="hud-label">RING</span><span id="hud-ring" class="hud-big">0/12</span></div>
+    <div class="hud-row"><span class="hud-label">TIME</span><span id="hud-time" class="hud-big">3:00</span></div>
+    <div class="hud-row"><span class="hud-label">FUEL</span><span id="hud-fuelbar"><span id="hud-fuelfill"></span></span></div>
+  </div>
+
+  <div id="hud-bottom-left" class="hud-panel">
+    <canvas id="attitude" width="150" height="150"></canvas>
+    <div id="hud-throttle"><span class="hud-label">THR</span><span id="hud-thrbar"><span id="hud-thrfill"></span></span><span id="hud-thr">0%</span></div>
+    <div id="hud-gear">GEAR DOWN</div>
+  </div>
+
+  <div id="hud-bottom-right" class="hud-panel">
+    <div id="hud-next">NEXT RING <span id="hud-dist">—</span></div>
+    <div id="hud-hint">W/S pitch &nbsp; A/D bank &nbsp; SHIFT/CTRL throttle &nbsp; SPACE brake &nbsp; C camera &nbsp; P pause</div>
+  </div>
+
+  <div id="hud-toast"></div>
+  <div id="hud-center">+100</div>
+  <div id="hud-warn"></div>
+</div>
+
+<!-- ============ MENU ============ -->
+<div id="menu" class="overlay">
+  <div class="menu-card">
+    <div class="menu-kicker">KEPULAUAN CENDRAWASIH &middot; GOLDEN HOUR</div>
+    <h1>SKYRING<br>COURIER</h1>
+    <p class="menu-story">You fly the mail plane <b>Kutilang-7</b> across a tropical archipelago.
+      Thread all <b>12 sky rings</b>, mind your fuel, and bring her home on the
+      runway at Tanjung Cendrawasih. Every ring is a delivery. Every landing is a bonus.</p>
+    <div class="menu-controls">
+      <div><b>W / S</b> pitch &nbsp; <b>A / D</b> bank &amp; turn</div>
+      <div><b>SHIFT / CTRL</b> throttle up / down &nbsp; <b>SPACE</b> airbrake</div>
+      <div><b>MOUSE</b> steer gently &nbsp; <b>C</b> chase / cockpit &nbsp; <b>P</b> pause &nbsp; <b>R</b> restart</div>
+    </div>
+    <button id="btn-fly">TAKE OFF &nbsp;&#9654;</button>
+    <div class="menu-foot">A complete flight game &middot; keyboard + mouse &middot; no network needed</div>
+  </div>
+</div>
+
+<!-- ============ PAUSE ============ -->
+<div id="pause" class="overlay hidden">
+  <div class="menu-card">
+    <h2>PAUSED</h2>
+    <p class="menu-story">The mail waits for no pilot. Press <b>P</b> to keep flying.</p>
+    <button id="btn-resume">RESUME &nbsp;&#9654;</button>
+  </div>
+</div>
+
+<!-- ============ END ============ -->
+<div id="end" class="overlay hidden">
+  <div class="menu-card">
+    <div class="menu-kicker" id="end-kicker">SORTIE COMPLETE</div>
+    <h2 id="end-title">HOME SAFE</h2>
+    <p class="menu-story" id="end-story"></p>
+    <div class="end-stats">
+      <div><span class="hud-label">SCORE</span><span id="end-score" class="hud-big">0</span></div>
+      <div><span class="hud-label">RINGS</span><span id="end-rings" class="hud-big">0/12</span></div>
+      <div><span class="hud-label">LANDINGS</span><span id="end-land" class="hud-big">0</span></div>
+      <div><span class="hud-label">TIME</span><span id="end-time" class="hud-big">0:00</span></div>
+    </div>
+    <button id="btn-again">FLY AGAIN &nbsp;&#8635;</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
