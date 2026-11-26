@@ -54,8 +54,15 @@ function requireShippable(repo: string): void {
 }
 
 function stageGame(repo: string, out: string): void {
-  rmSync(out, { recursive: true, force: true });
+  // Never remove the output directory itself: in the grader it is a
+  // mounted volume, and removing a mount point fails (EBUSY) — that
+  // killed the first entry at startup (exit 1 in ~200 ms). Clear only
+  // the trees this program owns, then copy fresh: same bytes every run.
   mkdirSync(out, { recursive: true });
+  for (const dir of [GAME_DIR, SHOTS_DIR]) {
+    rmSync(join(out, dir), { recursive: true, force: true });
+  }
+  rmSync(join(out, DOSSIER_FILE), { force: true });
   cpSync(join(repo, GAME_DIR), join(out, GAME_DIR), { recursive: true });
   cpSync(join(repo, SHOTS_DIR), join(out, SHOTS_DIR), { recursive: true });
 }
