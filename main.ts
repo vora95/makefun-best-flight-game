@@ -11,7 +11,7 @@
 //
 // The output is deterministic: the same repository always produces the
 // same bytes, which is what the grader's run_deterministic check verifies.
-import { cpSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
@@ -53,9 +53,15 @@ function requireShippable(repo: string): void {
   }
 }
 
-function stageGame(repo: string, out: string): void {
-  rmSync(out, { recursive: true, force: true });
+function emptyDir(out: string): void {
   mkdirSync(out, { recursive: true });
+  for (const entry of readdirSync(out)) {
+    rmSync(join(out, entry), { recursive: true, force: true });
+  }
+}
+
+function stageGame(repo: string, out: string): void {
+  emptyDir(out);
   cpSync(join(repo, GAME_DIR), join(out, GAME_DIR), { recursive: true });
   cpSync(join(repo, SHOTS_DIR), join(out, SHOTS_DIR), { recursive: true });
 }
